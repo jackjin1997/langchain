@@ -866,15 +866,16 @@ class ChatOllama(BaseChatModel):
                 raise TypeError(msg)
 
             content = ""
+            text_parts: list[str] = []
             images = []
             if isinstance(message.content, str):
                 content = message.content
             else:  # List
                 for content_part in message.content:
                     if isinstance(content_part, str):
-                        content += f"\n{content_part}"
+                        text_parts.append(content_part)
                     elif content_part.get("type") == "text":
-                        content += f"\n{content_part['text']}"
+                        text_parts.append(content_part["text"])
                     elif content_part.get("type") == "tool_use":
                         continue
                     elif content_part.get("type") == "image_url":
@@ -913,6 +914,7 @@ class ChatOllama(BaseChatModel):
                             "with a string 'image_url' field."
                         )
                         raise ValueError(msg)
+                content = "\n".join(text_parts)
             # Should convert to ollama.Message once role includes tool, and tool_call_id
             # is in Message
             msg_: dict = {

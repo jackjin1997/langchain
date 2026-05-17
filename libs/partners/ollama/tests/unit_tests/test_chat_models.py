@@ -485,6 +485,44 @@ def test_invoke_raises_when_client_none() -> None:
             llm.invoke([HumanMessage("Hello")])
 
 
+def test_multimodal_text_content_not_prefixed_with_newline() -> None:
+    """Multimodal text in a list-format `HumanMessage` must not start with `\\n`.
+
+    GH #37480: each text segment was unconditionally prefixed with `\\n`, so a
+    message like `[{"type": "text", "text": "..."}, {"type": "image_url", ...}]`
+    produced `content="\\n..."`. Vision models that are sensitive to exact prompt
+    formatting (e.g. `deepseek-ocr`) silently return empty responses for inputs
+    that start with `\\n`, making the failure invisible to the user.
+    """
+    llm = ChatOllama(model=MODEL_NAME)
+    message = HumanMessage(
+        content=[
+            {"type": "text", "text": "Extract all text from this image."},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": "data:image/png;base64,iVBORw0KGgo=",
+                },
+            },
+        ]
+    )
+    ollama_messages = llm._convert_messages_to_ollama_messages([message])
+    assert ollama_messages[0]["content"] == "Extract all text from this image."
+
+
+def test_multimodal_multiple_text_parts_joined_with_newline() -> None:
+    """Multiple text parts are joined with `\\n`, with no leading `\\n`."""
+    llm = ChatOllama(model=MODEL_NAME)
+    message = HumanMessage(
+        content=[
+            {"type": "text", "text": "First instruction."},
+            {"type": "text", "text": "Second instruction."},
+        ]
+    )
+    ollama_messages = llm._convert_messages_to_ollama_messages([message])
+    assert ollama_messages[0]["content"] == "First instruction.\nSecond instruction."
+
+
 def test_chat_ollama_ignores_strict_arg() -> None:
     """Test that ChatOllama ignores the 'strict' argument."""
     response = [
