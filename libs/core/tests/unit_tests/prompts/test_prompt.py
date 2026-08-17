@@ -1,7 +1,9 @@
 """Test functionality related to prompts."""
 
 import re
+from collections import ChainMap, UserDict
 from tempfile import NamedTemporaryFile
+from types import MappingProxyType
 from typing import Any, Literal
 from unittest import mock
 
@@ -249,6 +251,23 @@ def test_mustache_prompt_from_template(snapshot: SnapshotAssertion) -> None:
         "title": "PromptInput",
         "type": "object",
     }
+
+
+@pytest.mark.parametrize(
+    "user",
+    [
+        ChainMap({"name": "Alice"}),
+        UserDict({"name": "Alice"}),
+        MappingProxyType({"name": "Alice"}),
+    ],
+)
+def test_mustache_prompt_supports_mapping(user: object) -> None:
+    """Test dotted lookup supports the declared `Mapping` contract."""
+    prompt = PromptTemplate.from_template(
+        "Hello {{user.name}}", template_format="mustache"
+    )
+
+    assert prompt.format(user=user) == "Hello Alice"
 
 
 def test_prompt_from_template_with_partial_variables() -> None:

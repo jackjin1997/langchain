@@ -394,12 +394,12 @@ def _get_key(
                 if resolved_scope in (0, False):
                     return resolved_scope
                 # Move into the scope
-                if isinstance(resolved_scope, dict):
+                if isinstance(resolved_scope, Mapping):
                     try:
                         resolved_scope = resolved_scope[child]
                     except (KeyError, TypeError):
                         # Key not found - will be caught by outer try-except
-                        msg = f"Key {child!r} not found in dict"
+                        msg = f"Key {child!r} not found in mapping"
                         raise KeyError(msg) from None
                 elif isinstance(resolved_scope, (list, tuple)):
                     try:
