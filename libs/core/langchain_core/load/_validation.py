@@ -66,6 +66,19 @@ def _is_escaped_dict(obj: dict[str, Any]) -> bool:
     return len(obj) == 1 and _LC_ESCAPED_KEY in obj
 
 
+def _serialize_escaped_value(obj: Any) -> Any:
+    """Normalize values inside escaped user data without creating LC objects."""
+    if isinstance(obj, dict):
+        if not all(isinstance(k, (str, int, float, bool, type(None))) for k in obj):
+            return to_json_not_implemented(obj)
+        return {k: _serialize_escaped_value(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_serialize_escaped_value(item) for item in obj]
+    if isinstance(obj, (str, int, float, bool, type(None))):
+        return obj
+    return to_json_not_implemented(obj)
+
+
 def _serialize_value(obj: Any) -> Any:
     """Serialize a value with escaping of user dicts.
 
@@ -85,12 +98,11 @@ def _serialize_value(obj: Any) -> Any:
         if not all(isinstance(k, (str, int, float, bool, type(None))) for k in obj):
             # if keys are not json serializable
             return to_json_not_implemented(obj)
-        # Check if dict needs escaping BEFORE recursing into values.
-        # If it needs escaping, wrap it as-is - the contents are user data that
-        # will be returned as-is during deserialization (no instantiation).
-        # This prevents re-escaping of already-escaped nested content.
+        # Escaped contents are returned without deserialization, so normalize their
+        # values without adding nested escape markers or creating LC objects.
         if _needs_escaping(obj):
-            return _escape_dict(obj)
+            normalized = {k: _serialize_escaped_value(v) for k, v in obj.items()}
+            return _escape_dict(normalized)
         # Safe dict (no 'lc' key) - recurse into values
         return {k: _serialize_value(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):

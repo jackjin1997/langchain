@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import json
 import warnings
@@ -625,6 +626,26 @@ class TestDumpdEscapesLcKeyInPlainDicts:
         assert serialized["kwargs"]["metadata"] == {
             "__lc_escaped__": {"lc": 1, "type": "constructor"}
         }
+
+    def test_lc_key_with_non_json_value_remains_json_serializable(self) -> None:
+        """Test escaped user data normalizes nested non-JSON values."""
+        indexed_at = datetime.datetime(2024, 1, 1, tzinfo=datetime.UTC)
+        doc = Document(
+            page_content="test",
+            metadata={"lc": "en", "indexed_at": indexed_at},
+        )
+
+        serialized = dumpd(doc)
+
+        json.dumps(serialized)
+        serialized_datetime = serialized["kwargs"]["metadata"]["__lc_escaped__"][
+            "indexed_at"
+        ]
+        assert serialized_datetime["type"] == "not_implemented"
+        assert serialized_datetime["id"] == ["datetime", "datetime"]
+
+        parsed = json.loads(dumps({"lc": "en", "indexed_at": indexed_at}))
+        assert parsed["__lc_escaped__"]["indexed_at"]["type"] == "not_implemented"
 
     def test_document_metadata_with_nested_lc_key_escaped(self) -> None:
         """Test that `Document` with nested `'lc'` in metadata is escaped."""
