@@ -529,7 +529,44 @@ def test_graph_mermaid_to_safe_id() -> None:
     assert _to_safe_id("foo") == "foo"
     assert _to_safe_id("foo-bar") == "foo-bar"
     assert _to_safe_id("foo_1") == "foo_1"
-    assert _to_safe_id("#foo*&!") == "\\23foo\\2a\\26\\21"
+    assert _to_safe_id("#foo*&!") == "_lc_23666f6f2a2621"
+    assert _to_safe_id("_lc_foo") == "_lc_5f6c635f666f6f"
+
+
+def test_graph_mermaid_brackets_in_node_name() -> None:
+    """Test that Mermaid syntax remains valid for bracketed node names."""
+    node_name = "PIIMiddleware[email].before_model"
+    graph = Graph(
+        nodes={
+            "start": Node(
+                id="start",
+                name="start",
+                data=BaseModel,
+                metadata=None,
+            ),
+            node_name: Node(
+                id=node_name,
+                name=node_name,
+                data=BaseModel,
+                metadata=None,
+            ),
+            "finish": Node(
+                id="finish",
+                name="finish",
+                data=BaseModel,
+                metadata=None,
+            ),
+        },
+        edges=[
+            Edge(source="start", target=node_name, data=None, conditional=False),
+            Edge(source=node_name, target="finish", data=None, conditional=False),
+        ],
+    )
+
+    assert (
+        "\t_lc_5049494d6964646c65776172655b656d61696c5d2e6265666f72655f6d6f64656c("
+        '"PIIMiddleware[email].before_model")\n' in graph.draw_mermaid()
+    )
 
 
 def test_graph_mermaid_duplicate_nodes(snapshot: SnapshotAssertion) -> None:

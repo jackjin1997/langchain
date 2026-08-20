@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import html
 import random
 import re
 import string
@@ -40,6 +41,7 @@ except ImportError:
     _HAS_PYPPETEER = False
 
 MARKDOWN_SPECIAL_CHARS = "*_`"
+_MERMAID_SAFE_ID_PREFIX = "_lc_"
 
 
 def draw_mermaid(
@@ -132,11 +134,13 @@ def draw_mermaid(
     def render_node(key: str, node: Node, indent: str = "\t") -> str:
         """Helper function to render a node with consistent formatting."""
         node_name = node.name.split(":")[-1]
+        quote_label = any(not (char.isalnum() or char in " _-") for char in node_name)
+        escaped_node_name = html.escape(node_name, quote=True)
         label = (
-            f"<p>{node_name}</p>"
+            f"<p>{escaped_node_name}</p>"
             if node_name.startswith(tuple(MARKDOWN_SPECIAL_CHARS))
             and node_name.endswith(tuple(MARKDOWN_SPECIAL_CHARS))
-            else node_name
+            else escaped_node_name
         )
         if node.metadata:
             label = (
@@ -144,6 +148,8 @@ def draw_mermaid(
                 + "\n".join(f"{k} = {value}" for k, value in node.metadata.items())
                 + "</em></small>"
             )
+        if quote_label:
+            label = f'"{label}"'
         node_label = format_dict.get(key, format_dict[default_class_label]).format(
             _to_safe_id(key), label
         )
@@ -255,15 +261,20 @@ def draw_mermaid(
 def _to_safe_id(label: str) -> str:
     """Convert a string into a Mermaid-compatible node id.
 
-    Keep [a-zA-Z0-9_-] characters unchanged.
-    Map every other character -> backslash + lowercase hex codepoint.
+    Keep `[a-zA-Z0-9_-]` labels unchanged unless they use the reserved prefix.
+    Encode every other label as UTF-8 hex behind the reserved prefix.
 
-    Result is guaranteed to be unique and Mermaid-compatible,
-    so nodes with special characters always render correctly.
+    This keeps ordinary ids readable while ensuring encoded ids cannot collide with
+    unchanged ids.
     """
     allowed = string.ascii_letters + string.digits + "_-"
-    out = [ch if ch in allowed else "\\" + format(ord(ch), "x") for ch in label]
-    return "".join(out)
+    if (
+        label
+        and all(char in allowed for char in label)
+        and not label.startswith(_MERMAID_SAFE_ID_PREFIX)
+    ):
+        return label
+    return f"{_MERMAID_SAFE_ID_PREFIX}{label.encode('utf-8').hex()}"
 
 
 def _generate_mermaid_graph_styles(node_colors: NodeStyles) -> str:
