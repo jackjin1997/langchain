@@ -1036,6 +1036,44 @@ def test_combine_llm_outputs_with_missing_details() -> None:
     assert "input_tokens_details" not in result["token_usage"]
 
 
+def test_combine_llm_outputs_ignores_none_token_usage() -> None:
+    """Test that missing token usage does not replace accumulated values."""
+    llm = ChatGroq(model="test-model")
+
+    llm_outputs: list[dict[str, Any] | None] = [
+        {
+            "token_usage": {
+                "prompt_tokens": None,
+                "completion_tokens": 10,
+                "total_tokens": None,
+                "input_tokens_details": {
+                    "cached_tokens": 4,
+                    "audio_tokens": None,
+                },
+            },
+        },
+        {
+            "token_usage": {
+                "prompt_tokens": 5,
+                "completion_tokens": None,
+                "total_tokens": None,
+                "input_tokens_details": {
+                    "cached_tokens": None,
+                    "audio_tokens": 2,
+                },
+            },
+        },
+    ]
+
+    result = llm._combine_llm_outputs(llm_outputs)
+
+    assert result["token_usage"] == {
+        "prompt_tokens": 5,
+        "completion_tokens": 10,
+        "input_tokens_details": {"cached_tokens": 4, "audio_tokens": 2},
+    }
+
+
 def test_profile() -> None:
     model = ChatGroq(model="openai/gpt-oss-20b")
     assert model.profile
