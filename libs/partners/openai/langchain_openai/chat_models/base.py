@@ -4350,20 +4350,36 @@ def _create_usage_metadata(
     service_tier_prefix = f"{service_tier}_" if service_tier else ""
     prompt_tokens_details = oai_token_usage.get("prompt_tokens_details") or {}
     input_token_details: dict = {
-        "audio": prompt_tokens_details.get("audio_tokens"),
-        f"{service_tier_prefix}cache_read": prompt_tokens_details.get("cached_tokens"),
-        f"{service_tier_prefix}cache_creation": prompt_tokens_details.get(
-            "cache_write_tokens"
-        ),
+        key: value
+        for key, value in prompt_tokens_details.items()
+        if key not in {"audio_tokens", "cached_tokens", "cache_write_tokens"}
+        and value is not None
     }
+    input_token_details.update(
+        {
+            "audio": prompt_tokens_details.get("audio_tokens"),
+            f"{service_tier_prefix}cache_read": prompt_tokens_details.get(
+                "cached_tokens"
+            ),
+            f"{service_tier_prefix}cache_creation": prompt_tokens_details.get(
+                "cache_write_tokens"
+            ),
+        }
+    )
+    completion_tokens_details = oai_token_usage.get("completion_tokens_details") or {}
     output_token_details: dict = {
-        "audio": (oai_token_usage.get("completion_tokens_details") or {}).get(
-            "audio_tokens"
-        ),
-        f"{service_tier_prefix}reasoning": (
-            oai_token_usage.get("completion_tokens_details") or {}
-        ).get("reasoning_tokens"),
+        key: value
+        for key, value in completion_tokens_details.items()
+        if key not in {"audio_tokens", "reasoning_tokens"} and value is not None
     }
+    output_token_details.update(
+        {
+            "audio": completion_tokens_details.get("audio_tokens"),
+            f"{service_tier_prefix}reasoning": completion_tokens_details.get(
+                "reasoning_tokens"
+            ),
+        }
+    )
     if service_tier is not None:
         # Avoid counting cache-read and reasoning tokens towards the service tier
         # token counts, since service tier tokens are already priced differently

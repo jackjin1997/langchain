@@ -1399,6 +1399,43 @@ def test__create_usage_metadata_cache_tokens_zero_retained() -> None:
     }
 
 
+def test__create_usage_metadata_preserves_provider_specific_details() -> None:
+    usage_metadata = {
+        "completion_tokens": 15,
+        "prompt_tokens_details": {
+            "audio_tokens": 2,
+            "cached_tokens": 0,
+            "text_tokens": 11,
+            "vendor_zero": 0,
+            "vendor_none": None,
+        },
+        "completion_tokens_details": {
+            "audio_tokens": 3,
+            "reasoning_tokens": 4,
+            "text_tokens": 8,
+            "accepted_prediction_tokens": 0,
+            "rejected_prediction_tokens": None,
+        },
+        "prompt_tokens": 11,
+        "total_tokens": 26,
+    }
+
+    result = _create_usage_metadata(usage_metadata)
+
+    assert result["input_token_details"] == {
+        "audio": 2,
+        "cache_read": 0,
+        "text_tokens": 11,
+        "vendor_zero": 0,
+    }
+    assert result["output_token_details"] == {
+        "audio": 3,
+        "reasoning": 4,
+        "text_tokens": 8,
+        "accepted_prediction_tokens": 0,
+    }
+
+
 def test__create_usage_metadata_service_tier_excludes_cache_read_tokens() -> None:
     """Tier counts exclude cache reads but not overlapping cache writes."""
     usage_metadata = {
