@@ -30,6 +30,7 @@ from langchain_text_splitters.json import RecursiveJsonSplitter
 from langchain_text_splitters.jsx import JSFrameworkTextSplitter
 from langchain_text_splitters.markdown import (
     ExperimentalMarkdownSyntaxTextSplitter,
+    LineType,
     MarkdownHeaderTextSplitter,
 )
 from langchain_text_splitters.python import PythonCodeTextSplitter
@@ -1460,6 +1461,35 @@ def test_md_header_text_splitter_1() -> None:
         ),
     ]
     assert output == expected_output
+
+
+def test_md_header_text_splitter_aggregates_without_repeated_string_growth() -> None:
+    """Test same-metadata chunks are joined without incremental concatenation."""
+
+    class CountingContent(str):
+        __slots__ = ()
+
+        add_calls = 0
+
+        def __add__(self, value: str) -> CountingContent:
+            type(self).add_calls += 1
+            return type(self)(super().__add__(value))
+
+    lines: list[LineType] = [
+        {"content": CountingContent(str(index)), "metadata": {"Header 1": "Foo"}}
+        for index in range(100)
+    ]
+    splitter = MarkdownHeaderTextSplitter(headers_to_split_on=[("#", "Header 1")])
+
+    output = splitter.aggregate_lines_to_chunks(lines)
+
+    assert output == [
+        Document(
+            page_content="  \n".join(str(index) for index in range(100)),
+            metadata={"Header 1": "Foo"},
+        )
+    ]
+    assert CountingContent.add_calls == 0
 
 
 def test_md_header_text_splitter_2() -> None:
