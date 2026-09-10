@@ -1,7 +1,38 @@
 import pytest
+from langchain_core.documents import Document
 
 from langchain_classic.chains.qa_with_sources.base import QAWithSourcesChain
 from tests.unit_tests.llms.fake_llm import FakeLLM
+
+
+def test_invoke_does_not_mutate_inputs() -> None:
+    qa_chain = QAWithSourcesChain.from_llm(FakeLLM())
+    inputs = {
+        "question": "What is the answer?",
+        "docs": [Document(page_content="The answer is 42.", metadata={"source": "1"})],
+    }
+
+    qa_chain.invoke(inputs)
+
+    assert inputs == {
+        "question": "What is the answer?",
+        "docs": [Document(page_content="The answer is 42.", metadata={"source": "1"})],
+    }
+
+
+async def test_ainvoke_does_not_mutate_inputs() -> None:
+    qa_chain = QAWithSourcesChain.from_llm(FakeLLM())
+    inputs = {
+        "question": "What is the answer?",
+        "docs": [Document(page_content="The answer is 42.", metadata={"source": "1"})],
+    }
+
+    await qa_chain.ainvoke(inputs)
+
+    assert inputs == {
+        "question": "What is the answer?",
+        "docs": [Document(page_content="The answer is 42.", metadata={"source": "1"})],
+    }
 
 
 @pytest.mark.parametrize(

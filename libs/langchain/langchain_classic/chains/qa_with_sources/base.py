@@ -155,6 +155,7 @@ class BaseQAWithSourcesChain(Chain, ABC):
         inputs: dict[str, Any],
         run_manager: CallbackManagerForChainRun | None = None,
     ) -> dict[str, str]:
+        inputs = inputs.copy()
         _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
         accepts_run_manager = (
             "run_manager" in inspect.signature(self._get_docs).parameters
@@ -192,6 +193,7 @@ class BaseQAWithSourcesChain(Chain, ABC):
         inputs: dict[str, Any],
         run_manager: AsyncCallbackManagerForChainRun | None = None,
     ) -> dict[str, Any]:
+        inputs = inputs.copy()
         _run_manager = run_manager or AsyncCallbackManagerForChainRun.get_noop_manager()
         accepts_run_manager = (
             "run_manager" in inspect.signature(self._aget_docs).parameters
