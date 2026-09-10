@@ -8,6 +8,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import threading
 from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import Any, Literal, overload
@@ -137,6 +138,63 @@ def test_file_provider_persists_token_with_private_perms(tmp_path: Path) -> None
     reloaded = fresh.get_token()
     assert reloaded.access_token == "at"
     assert reloaded.account_id == "acct-1"
+
+
+def test_atomic_write_uses_unique_temporary_paths_for_concurrent_writers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = tmp_path / "auth.json"
+    replace_barrier = threading.Barrier(2)
+    temporary_paths: list[Path] = []
+    errors: list[Exception] = []
+    original_replace = Path.replace
+
+    def _synchronized_replace(source: Path, target: Path) -> Path:
+        if target == store:
+            temporary_paths.append(source)
+            replace_barrier.wait(timeout=3)
+        return original_replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", _synchronized_replace)
+
+    def _write(value: int) -> None:
+        try:
+            oauth_module._atomic_write_private_json(store, {"writer": value})
+        except Exception as error:
+            errors.append(error)
+
+    threads = [threading.Thread(target=_write, args=(value,)) for value in (1, 2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert len(set(temporary_paths)) == 2
+    assert json.loads(store.read_text()) in ({"writer": 1}, {"writer": 2})
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_atomic_write_failure_only_cleans_its_own_temporary_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = tmp_path / "auth.json"
+    unrelated_temporary_path = tmp_path / "auth.json.tmp"
+    unrelated_temporary_path.write_text("other writer")
+
+    def _fail_replace(_source: Path, _target: Path) -> Path:
+        msg = "simulated replace failure"
+        raise OSError(msg)
+
+    monkeypatch.setattr(Path, "replace", _fail_replace)
+
+    with pytest.raises(OSError, match="simulated replace failure"):
+        oauth_module._atomic_write_private_json(store, {"writer": 1})
+
+    assert unrelated_temporary_path.read_text() == "other writer"
+    assert list(tmp_path.glob(".auth.json.*.tmp")) == []
 
 
 def test_file_provider_get_token_does_not_refresh_when_valid(
