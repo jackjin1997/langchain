@@ -102,7 +102,7 @@ class MapReduceChain(Chain):
     ) -> dict[str, str]:
         _run_manager = run_manager or CallbackManagerForChainRun.get_noop_manager()
         # Split the larger text into smaller chunks.
-        doc_text = inputs.pop(self.input_key)
+        doc_text = inputs[self.input_key]
         texts = self.text_splitter.split_text(doc_text)
         docs = [Document(page_content=text) for text in texts]
         _inputs: dict[str, Any] = {
