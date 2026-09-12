@@ -2026,7 +2026,9 @@ def _make_tools_to_model_edge(
             return end_destination
 
         # 3. Exit condition: A structured output tool was executed
-        if any(t.name in structured_output_tools for t in tool_messages):
+        if state.get("structured_response") is not None and any(
+            t.name in structured_output_tools for t in tool_messages
+        ):
             return end_destination
 
         # 4. Default: Continue the loop

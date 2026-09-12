@@ -565,6 +565,38 @@ class TestResponseFormatAsToolStrategy:
         assert len(response["messages"]) == 5
         assert response["structured_response"] == EXPECTED_WEATHER_PYDANTIC
 
+    def test_structured_output_parsing_error_with_sibling_tool_retries(self) -> None:
+        """Test that a sibling tool call does not suppress structured output retry."""
+        tool_calls = [
+            [
+                {
+                    "name": "WeatherBaseModel",
+                    "id": "1",
+                    "args": {"invalid": "data"},
+                },
+                {"name": "get_weather", "id": "2", "args": {}},
+            ],
+            [
+                {
+                    "name": "WeatherBaseModel",
+                    "id": "3",
+                    "args": WEATHER_DATA,
+                },
+            ],
+        ]
+
+        model = FakeToolCallingModel(tool_calls=tool_calls)
+        agent = create_agent(
+            model,
+            [get_weather],
+            response_format=ToolStrategy(WeatherBaseModel, handle_errors=True),
+        )
+
+        response = agent.invoke({"messages": [HumanMessage("What's the weather?")]})
+
+        assert model.index == 2
+        assert response["structured_response"] == EXPECTED_WEATHER_PYDANTIC
+
     def test_retry_with_custom_function(self) -> None:
         """Test retry with custom message generation."""
         tool_calls = [
