@@ -2133,6 +2133,16 @@ EXPERIMENTAL_MARKDOWN_DOCUMENTS = [
 ]
 
 
+def test_experimental_markdown_syntax_text_splitter_preserves_prior_results() -> None:
+    """Test consecutive calls do not mutate previously returned documents."""
+    markdown_splitter = ExperimentalMarkdownSyntaxTextSplitter()
+
+    first_result = markdown_splitter.split_text("first document\n")
+    markdown_splitter.split_text("second document\n")
+
+    assert first_result == [Document(page_content="first document\n")]
+
+
 def test_experimental_markdown_syntax_text_splitter_on_multi_files() -> None:
     """Test ExperimentalMarkdownSyntaxTextSplitter on multiple files.
 
