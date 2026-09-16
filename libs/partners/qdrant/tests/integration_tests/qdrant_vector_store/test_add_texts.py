@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import TYPE_CHECKING
 
 import pytest
 from langchain_core.documents import Document
@@ -13,6 +14,9 @@ from tests.integration_tests.common import (
     assert_documents_equals,
 )
 from tests.integration_tests.fixtures import qdrant_locations, retrieval_modes
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 @pytest.mark.parametrize("location", qdrant_locations())
@@ -141,3 +145,34 @@ def test_qdrant_add_texts_stores_ids(
     stored_ids = [point.id for point in vec_store.client.scroll(collection_name)[0]]
     assert set(ids) == set(stored_ids)
     assert len(vec_store.get_by_ids(ids)) == 3
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [
+        [],
+        ["fa38d572-4c31-4579-aedc-1960d79df6df"],
+        [
+            "fa38d572-4c31-4579-aedc-1960d79df6df",
+            "9f587830-1468-4f44-9e5a-2df797b2978a",
+            "a7e6395c-8d0c-498c-8f79-e301e925a62c",
+        ],
+    ],
+)
+def test_qdrant_add_texts_rejects_mismatched_ids(
+    ids: list[str], mocker: MockerFixture
+) -> None:
+    """Test that Qdrant.add_texts rejects mismatched text and ID counts."""
+    vec_store = QdrantVectorStore.from_texts(
+        ["seed"],
+        ConsistentFakeEmbeddings(),
+        location=":memory:",
+    )
+    count_before = vec_store.client.count(vec_store.collection_name).count
+    build_vectors = mocker.spy(vec_store, "_build_vectors")
+
+    with pytest.raises(ValueError, match="number of ids must match"):
+        vec_store.add_texts(["document A", "document B"], ids=ids)
+
+    build_vectors.assert_not_called()
+    assert vec_store.client.count(vec_store.collection_name).count == count_before

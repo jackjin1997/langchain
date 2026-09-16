@@ -506,6 +506,14 @@ class QdrantVectorStore(VectorStore):
             List of ids from adding the texts into the `VectorStore`.
 
         """
+        texts = list(texts)
+        if ids is not None and len(ids) != len(texts):
+            msg = (
+                "The number of ids must match the number of texts. "
+                f"Got {len(ids)} ids and {len(texts)} texts."
+            )
+            raise ValueError(msg)
+
         added_ids = []
         for batch_ids, points in self._generate_batches(
             texts, metadatas, ids, batch_size
@@ -1044,7 +1052,9 @@ class QdrantVectorStore(VectorStore):
     ) -> Generator[tuple[list[str | int], list[models.PointStruct]], Any, None]:
         texts_iterator = iter(texts)
         metadatas_iterator = iter(metadatas or [])
-        ids_iterator = iter(ids or [uuid.uuid4().hex for _ in iter(texts)])
+        ids_iterator = iter(
+            ids if ids is not None else [uuid.uuid4().hex for _ in iter(texts)]
+        )
 
         while batch_texts := list(islice(texts_iterator, batch_size)):
             batch_metadatas = list(islice(metadatas_iterator, batch_size)) or None
