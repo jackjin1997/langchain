@@ -46,6 +46,22 @@ async def test_prompttemplate_prefix_suffix() -> None:
     assert output == expected_output
 
 
+async def test_prompttemplate_prefix_suffix_share_variable() -> None:
+    """Test that prefix and suffix PromptTemplates can share a variable."""
+    prompt = FewShotPromptWithTemplates(
+        prefix=PromptTemplate.from_template("Topic: {topic}"),
+        suffix=PromptTemplate.from_template("Answer about {topic}"),
+        input_variables=["topic"],
+        examples=[{"question": "1 + 1", "answer": "2"}],
+        example_prompt=EXAMPLE_PROMPT,
+        example_separator="\n",
+    )
+    expected_output = "Topic: cats\n1 + 1: 2\nAnswer about cats"
+
+    assert prompt.format(topic="cats") == expected_output
+    assert await prompt.aformat(topic="cats") == expected_output
+
+
 def test_prompttemplate_validation() -> None:
     """Test that few shot works when prefix and suffix are PromptTemplates."""
     prefix = PromptTemplate(
