@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from langchain_core.documents import Document
@@ -201,3 +202,32 @@ async def test_aadd_documents(
         time_weighted_retriever.memory_stream[-1].page_content
         == documents[0].page_content
     )
+
+
+async def test_add_documents_does_not_commit_memory_when_vectorstore_fails() -> None:
+    """Test failed vector store writes do not leave documents in memory."""
+    vectorstore = MockVectorStore()
+    retriever = TimeWeightedVectorStoreRetriever(vectorstore=vectorstore)
+    documents = [Document(page_content="test document")]
+
+    with (
+        patch.object(
+            vectorstore,
+            "add_documents",
+            side_effect=RuntimeError("write failed"),
+        ),
+        pytest.raises(RuntimeError, match="write failed"),
+    ):
+        retriever.add_documents(documents)
+    assert retriever.memory_stream == []
+
+    with (
+        patch.object(
+            vectorstore,
+            "aadd_documents",
+            new=AsyncMock(side_effect=RuntimeError("async write failed")),
+        ),
+        pytest.raises(RuntimeError, match="async write failed"),
+    ):
+        await retriever.aadd_documents(documents)
+    assert retriever.memory_stream == []

@@ -174,8 +174,9 @@ class TimeWeightedVectorStoreRetriever(BaseRetriever):
             if "created_at" not in doc.metadata:
                 doc.metadata["created_at"] = current_time
             doc.metadata["buffer_idx"] = len(self.memory_stream) + i
+        added_ids = self.vectorstore.add_documents(dup_docs, **kwargs)
         self.memory_stream.extend(dup_docs)
-        return self.vectorstore.add_documents(dup_docs, **kwargs)
+        return added_ids
 
     async def aadd_documents(
         self,
@@ -194,5 +195,6 @@ class TimeWeightedVectorStoreRetriever(BaseRetriever):
             if "created_at" not in doc.metadata:
                 doc.metadata["created_at"] = current_time
             doc.metadata["buffer_idx"] = len(self.memory_stream) + i
+        added_ids = await self.vectorstore.aadd_documents(dup_docs, **kwargs)
         self.memory_stream.extend(dup_docs)
-        return await self.vectorstore.aadd_documents(dup_docs, **kwargs)
+        return added_ids
