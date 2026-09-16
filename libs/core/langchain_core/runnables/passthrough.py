@@ -622,24 +622,29 @@ class RunnableAssign(RunnableSerializable[dict[str, Any], dict[str, Any]]):
         first_map_chunk_task = asyncio.create_task(
             anext(map_output, None),
         )
-        # consume passthrough stream
-        async for chunk in for_passthrough:
-            if not isinstance(chunk, dict):
-                msg = "The input to RunnablePassthrough.assign() must be a dict."  # type: ignore[unreachable]
-                raise ValueError(msg)  # noqa: TRY004
+        try:
+            # consume passthrough stream
+            async for chunk in for_passthrough:
+                if not isinstance(chunk, dict):
+                    msg = "The input to RunnablePassthrough.assign() must be a dict."  # type: ignore[unreachable]
+                    raise ValueError(msg)  # noqa: TRY004
 
-            # remove mapper keys from passthrough chunk, to be overwritten by map output
-            filtered = AddableDict(
-                {k: v for k, v in chunk.items() if k not in mapper_keys}
-            )
-            if filtered:
-                yield filtered
-        # yield map output
-        first_chunk = await first_map_chunk_task
-        if first_chunk is not None:
-            yield first_chunk
-            async for chunk in map_output:
-                yield chunk
+                # Remove mapper keys from passthrough chunk; map output overwrites them.
+                filtered = AddableDict(
+                    {k: v for k, v in chunk.items() if k not in mapper_keys}
+                )
+                if filtered:
+                    yield filtered
+            # yield map output
+            first_chunk = await first_map_chunk_task
+            if first_chunk is not None:
+                yield first_chunk
+                async for chunk in map_output:
+                    yield chunk
+        finally:
+            if not first_map_chunk_task.done():
+                first_map_chunk_task.cancel()
+            await asyncio.gather(first_map_chunk_task, return_exceptions=True)
 
     @override
     async def atransform(

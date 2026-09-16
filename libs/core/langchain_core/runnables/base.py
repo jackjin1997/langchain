@@ -4350,21 +4350,26 @@ class RunnableParallel(RunnableSerializable[Input, dict[str, Any]]):
             asyncio.create_task(get_next_chunk(generator)): (step_name, generator)
             for step_name, generator in named_generators
         }
-        # Yield chunks from each as they become available,
-        # and start the next iteration of the generator that yielded it.
-        # When all generators are exhausted, stop.
-        while tasks:
-            completed_tasks, _ = await asyncio.wait(
-                tasks, return_when=asyncio.FIRST_COMPLETED
-            )
-            for task in completed_tasks:
-                (step_name, generator) = tasks.pop(task)
-                try:
-                    yield AddableDict({step_name: task.result()})
-                    new_task = asyncio.create_task(get_next_chunk(generator))
-                    tasks[new_task] = (step_name, generator)
-                except StopAsyncIteration:
-                    pass
+        try:
+            # Yield chunks from each as they become available,
+            # and start the next iteration of the generator that yielded it.
+            # When all generators are exhausted, stop.
+            while tasks:
+                completed_tasks, _ = await asyncio.wait(
+                    tasks, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in completed_tasks:
+                    (step_name, generator) = tasks.pop(task)
+                    try:
+                        yield AddableDict({step_name: task.result()})
+                        new_task = asyncio.create_task(get_next_chunk(generator))
+                        tasks[new_task] = (step_name, generator)
+                    except StopAsyncIteration:
+                        pass
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     @override
     async def atransform(

@@ -3850,6 +3850,44 @@ async def test_astream_assign_empty_mapper() -> None:
     assert chunks == [{"a": 1}]
 
 
+async def test_atransform_assign_cancels_mapper_on_invalid_input() -> None:
+    """An invalid passthrough chunk must cancel in-flight mapper work."""
+    mapper_started = asyncio.Event()
+    mapper_cancelled = asyncio.Event()
+    release_mapper = asyncio.Event()
+
+    async def slow_mapper(
+        values: AsyncIterator[dict[str, str]],
+    ) -> AsyncIterator[str]:
+        async for value in values:
+            mapper_started.set()
+            try:
+                await release_mapper.wait()
+            except asyncio.CancelledError:
+                mapper_cancelled.set()
+                raise
+            yield value["valid"]
+
+    runnable = RunnablePassthrough.assign(mapped=RunnableGenerator(slow_mapper))
+
+    async def invalid_input() -> AsyncIterator[Any]:
+        yield {"valid": "first"}
+        await mapper_started.wait()
+        yield "invalid"
+
+    try:
+        with pytest.raises(
+            ValueError,
+            match=r"The input to RunnablePassthrough\.assign\(\) must be a dict\.",
+        ):
+            _ = [chunk async for chunk in runnable.atransform(invalid_input())]
+        await asyncio.sleep(0)
+        assert mapper_cancelled.is_set()
+    finally:
+        release_mapper.set()
+        await asyncio.sleep(0)
+
+
 def test_runnable_sequence_transform() -> None:
     llm = FakeStreamingListLLM(responses=["foo-lish"])
 
