@@ -62,6 +62,22 @@ async def test_add_by_ids() -> None:
     assert sorted(vectorstore.store.keys()) == ["1", "2", "3", "4", "5", "6"]
 
 
+async def test_delete_all() -> None:
+    """Test deleting all documents when IDs are omitted."""
+    vectorstore = InMemoryVectorStore(embedding=DeterministicFakeEmbedding(size=6))
+    vectorstore.add_texts(["foo", "bar"], ids=["1", "2"])
+
+    vectorstore.delete([])
+    assert sorted(vectorstore.store) == ["1", "2"]
+
+    vectorstore.delete()
+    assert vectorstore.store == {}
+
+    await vectorstore.aadd_texts(["foo", "bar"], ids=["1", "2"])
+    await vectorstore.adelete()
+    assert vectorstore.store == {}
+
+
 async def test_inmemory_mmr() -> None:
     """Test MMR search."""
     texts = ["foo", "foo", "fou", "foy"]
