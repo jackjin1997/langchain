@@ -83,6 +83,20 @@ def test_prompttemplate_validation() -> None:
     ).input_variables == ["content", "new_content"]
 
 
+def test_prompttemplate_infers_suffix_partial_variables() -> None:
+    """Partial variables used in the suffix are not required from the caller."""
+    prompt = FewShotPromptWithTemplates(
+        suffix=PromptTemplate.from_template("Language: {language}"),
+        input_variables=[],
+        partial_variables={"language": "Python"},
+        examples=[{"question": "foo", "answer": "bar"}],
+        example_prompt=EXAMPLE_PROMPT,
+    )
+
+    assert prompt.input_variables == []
+    assert prompt.format() == "foo: bar\n\nLanguage: Python"
+
+
 async def test_get_examples_requires_examples_or_selector() -> None:
     """Both `_get_examples` and `_aget_examples` raise when neither is set.
 

@@ -95,8 +95,10 @@ class FewShotPromptWithTemplates(StringPromptTemplate):
                 raise ValueError(msg)
         else:
             self.input_variables = sorted(
-                set(self.suffix.input_variables)
-                | set(self.prefix.input_variables if self.prefix else [])
+                (
+                    set(self.suffix.input_variables)
+                    | set(self.prefix.input_variables if self.prefix else [])
+                )
                 - set(self.partial_variables)
             )
         return self
