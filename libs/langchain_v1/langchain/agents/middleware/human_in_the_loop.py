@@ -504,6 +504,26 @@ class HumanInTheLoopMiddleware(AgentMiddleware[StateT, ContextT, ResponseT]):
                 revised_tool_call, tool_message = self._process_decision(
                     decision, tool_call, config
                 )
+                if decision["type"] == "edit":
+                    edited_action = decision["edited_action"]
+                    if (
+                        edited_action["name"] != tool_call["name"]
+                        and (target_config := self.interrupt_on.get(edited_action["name"]))
+                        is not None
+                    ):
+                        edited_tool_call = ToolCall(
+                            type="tool_call",
+                            name=edited_action["name"],
+                            args=edited_action["args"],
+                            id=tool_call["id"],
+                        )
+                        if self._should_interrupt(edited_tool_call, target_config, state, runtime):
+                            msg = (
+                                f"Edited tool call targets '{edited_action['name']}', which "
+                                "requires a separate human review. Cross-tool edits cannot "
+                                "bypass the target tool's interrupt policy."
+                            )
+                            raise ValueError(msg)
                 if revised_tool_call is not None:
                     revised_tool_calls.append(revised_tool_call)
                     if decision["type"] == "edit" and (edited_id := revised_tool_call.get("id")):

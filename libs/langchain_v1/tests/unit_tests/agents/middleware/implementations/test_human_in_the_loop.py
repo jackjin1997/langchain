@@ -164,6 +164,74 @@ def test_human_in_the_loop_middleware_single_tool_edit() -> None:
         }
 
 
+def test_human_in_the_loop_middleware_rejects_cross_tool_edit_requiring_review() -> None:
+    middleware = HumanInTheLoopMiddleware(
+        interrupt_on={
+            "tool_a": {"allowed_decisions": ["approve", "edit"]},
+            "tool_b": {"allowed_decisions": ["approve", "reject"]},
+        }
+    )
+    ai_message = AIMessage(
+        content="",
+        tool_calls=[{"name": "tool_a", "args": {"value": 1}, "id": "1"}],
+    )
+    state = AgentState[Any](messages=[ai_message])
+    decision = {
+        "decisions": [
+            {
+                "type": "edit",
+                "edited_action": Action(name="tool_b", args={"value": "edited"}),
+            }
+        ]
+    }
+
+    with (
+        patch(
+            "langchain.agents.middleware.human_in_the_loop.interrupt",
+            return_value=decision,
+        ),
+        pytest.raises(ValueError, match=r"tool_b.*separate human review"),
+    ):
+        middleware.after_model(state, Runtime())
+
+
+def test_human_in_the_loop_middleware_allows_cross_tool_edit_when_target_skips_review() -> None:
+    middleware = HumanInTheLoopMiddleware(
+        interrupt_on={
+            "tool_a": {"allowed_decisions": ["approve", "edit"]},
+            "tool_b": {
+                "allowed_decisions": ["approve", "reject"],
+                "when": lambda _request: False,
+            },
+        }
+    )
+    ai_message = AIMessage(
+        content="",
+        tool_calls=[{"name": "tool_a", "args": {"value": 1}, "id": "1"}],
+    )
+    state = AgentState[Any](messages=[ai_message])
+    decision = {
+        "decisions": [
+            {
+                "type": "edit",
+                "edited_action": Action(name="tool_b", args={"value": "edited"}),
+            }
+        ]
+    }
+
+    with patch(
+        "langchain.agents.middleware.human_in_the_loop.interrupt",
+        return_value=decision,
+    ):
+        result = middleware.after_model(state, Runtime())
+
+    assert result is not None
+    assert result["messages"][0].tool_calls == [
+        {"name": "tool_a", "args": {"value": 1}, "id": "1", "type": "tool_call"}
+    ]
+    assert result[_EDITED_TOOL_CALLS_KEY] == {"1": {"name": "tool_b", "args": {"value": "edited"}}}
+
+
 def test_human_in_the_loop_middleware_single_tool_rejection_reason() -> None:
     """Test a custom rejection reason retains its human-provided context."""
     middleware = HumanInTheLoopMiddleware(
