@@ -171,3 +171,8 @@ class ConversationSummaryMemory(BaseChatMemory, SummarizerMixin):
         """Clear memory contents."""
         super().clear()
         self.buffer = ""
+
+    async def aclear(self) -> None:
+        """Asynchronously clear memory contents."""
+        await super().aclear()
+        self.buffer = ""

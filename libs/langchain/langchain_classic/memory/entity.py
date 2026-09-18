@@ -632,3 +632,9 @@ class ConversationEntityMemory(BaseChatMemory):
         self.chat_memory.clear()
         self.entity_cache.clear()
         self.entity_store.clear()
+
+    async def aclear(self) -> None:
+        """Asynchronously clear memory contents."""
+        await self.chat_memory.aclear()
+        self.entity_cache.clear()
+        self.entity_store.clear()
