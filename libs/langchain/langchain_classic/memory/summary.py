@@ -167,7 +167,24 @@ class ConversationSummaryMemory(BaseChatMemory, SummarizerMixin):
             self.buffer,
         )
 
+    async def asave_context(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, str],
+    ) -> None:
+        """Asynchronously save context from this conversation to buffer."""
+        await super().asave_context(inputs, outputs)
+        self.buffer = await self.apredict_new_summary(
+            self.chat_memory.messages[-2:],
+            self.buffer,
+        )
+
     def clear(self) -> None:
         """Clear memory contents."""
         super().clear()
+        self.buffer = ""
+
+    async def aclear(self) -> None:
+        """Asynchronously clear memory contents."""
+        await super().aclear()
         self.buffer = ""

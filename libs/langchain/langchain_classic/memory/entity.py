@@ -627,6 +627,37 @@ class ConversationEntityMemory(BaseChatMemory):
             # Save the updated summary to the entity store
             self.entity_store.set(entity, output.strip())
 
+    async def asave_context(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, str],
+    ) -> None:
+        """Asynchronously save context and update the entity store."""
+        await super().asave_context(inputs, outputs)
+
+        if self.input_key is None:
+            prompt_input_key = get_prompt_input_key(inputs, self.memory_variables)
+        else:
+            prompt_input_key = self.input_key
+
+        buffer_string = get_buffer_string(
+            self.buffer[-self.k * 2 :],
+            human_prefix=self.human_prefix,
+            ai_prefix=self.ai_prefix,
+        )
+        input_data = inputs[prompt_input_key]
+        chain = LLMChain(llm=self.llm, prompt=self.entity_summarization_prompt)
+
+        for entity in self.entity_cache:
+            existing_summary = self.entity_store.get(entity, "")
+            output = await chain.apredict(
+                summary=existing_summary,
+                entity=entity,
+                history=buffer_string,
+                input=input_data,
+            )
+            self.entity_store.set(entity, output.strip())
+
     def clear(self) -> None:
         """Clear memory contents."""
         self.chat_memory.clear()

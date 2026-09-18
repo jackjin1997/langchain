@@ -64,6 +64,19 @@ class ConversationTokenBufferMemory(BaseChatMemory):
     def save_context(self, inputs: dict[str, Any], outputs: dict[str, str]) -> None:
         """Save context from this conversation to buffer. Pruned."""
         super().save_context(inputs, outputs)
+        self._prune()
+
+    async def asave_context(
+        self,
+        inputs: dict[str, Any],
+        outputs: dict[str, str],
+    ) -> None:
+        """Asynchronously save context from this conversation to buffer."""
+        await super().asave_context(inputs, outputs)
+        self._prune()
+
+    def _prune(self) -> None:
+        """Prune buffer if it exceeds the configured token limit."""
         # Prune buffer if it exceeds max token limit
         buffer = self.chat_memory.messages
         curr_buffer_length = self.llm.get_num_tokens_from_messages(buffer)
