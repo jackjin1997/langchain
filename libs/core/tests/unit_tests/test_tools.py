@@ -77,6 +77,8 @@ from langchain_core.tools.base import (
     create_schema_from_function,
     get_all_basemodel_annotations,
 )
+from langchain_core.tracers import BaseTracer
+from langchain_core.tracers.schemas import Run
 from langchain_core.utils.function_calling import (
     convert_to_openai_function,
     convert_to_openai_tool,
@@ -1386,6 +1388,72 @@ async def test_async_tool_pass_config(tool: BaseTool) -> None:
         await tool.ainvoke({"bar": "baz"}, {"configurable": {"foo": "not-bar"}})
         == "baz"
     )
+
+
+class _RootRunTracer(BaseTracer):
+    def __init__(self) -> None:
+        super().__init__()
+        self.roots: list[Run] = []
+
+    @override
+    def _persist_run(self, run: Run) -> None:
+        self.roots.append(run)
+
+
+def _identity(x: str) -> str:
+    return x
+
+
+_inner = RunnableLambda(_identity, name="inner")
+
+
+@tool
+def forward_config(bar: str, config: RunnableConfig) -> str:
+    """Forward the config to a nested runnable."""
+    return _inner.invoke(bar, config=config)
+
+
+@tool
+async def aforward_config(bar: str, config: RunnableConfig) -> str:
+    """Forward the config to a nested runnable."""
+    return await _inner.ainvoke(bar, config=config)
+
+
+class ForwardConfigBase(BaseTool):
+    name: str = "forward_config_base"
+    description: str = "Forward the config to a nested runnable."
+
+    @override
+    def _run(self, bar: str, config: RunnableConfig, **kwargs: Any) -> str:
+        return _inner.invoke(bar, config=config)
+
+
+class AForwardConfigBase(ForwardConfigBase):
+    @override
+    async def _arun(self, bar: str, config: RunnableConfig, **kwargs: Any) -> str:
+        return await _inner.ainvoke(bar, config=config)
+
+
+def _assert_nested_under_tool(tracer: _RootRunTracer, tool_name: str) -> None:
+    assert [run.name for run in tracer.roots] == [tool_name]
+    assert [run.name for run in tracer.roots[0].child_runs] == ["inner"]
+
+
+@pytest.mark.parametrize("tool_", [forward_config, ForwardConfigBase()])
+def test_tool_config_param_is_child_config(tool_: BaseTool) -> None:
+    tracer = _RootRunTracer()
+    assert tool_.invoke({"bar": "baz"}, {"callbacks": [tracer]}) == "baz"
+    _assert_nested_under_tool(tracer, tool_.name)
+
+
+@pytest.mark.parametrize(
+    "tool_",
+    [forward_config, aforward_config, ForwardConfigBase(), AForwardConfigBase()],
+)
+async def test_async_tool_config_param_is_child_config(tool_: BaseTool) -> None:
+    tracer = _RootRunTracer()
+    assert await tool_.ainvoke({"bar": "baz"}, {"callbacks": [tracer]}) == "baz"
+    _assert_nested_under_tool(tracer, tool_.name)
 
 
 def test_tool_description() -> None:
